@@ -154,7 +154,30 @@ async function run() {
 
 
 
-    app.get("/courses",async(req,res)=>{
+    app.patch("/courses/feedback/:id",verifiedJWT,verifyAdmin,async(req,res)=>{
+      const id=req.params.id;
+      const {feedback}=req.body;
+      const filter = { _id: new ObjectId(id) };
+      const updateDoc = {
+        $set: {
+          feedback: feedback,
+        },
+      };
+      const result = await classesCollection.updateOne(filter, updateDoc);
+      res.send(result);
+
+    })
+
+
+
+    app.get("/courses",verifiedJWT,verifyAdmin,async(req,res)=>{
+      const result=await classesCollection.find().toArray();
+      res.send(result)
+    })
+
+
+
+    app.get("/courses/allCourses",verifiedJWT,verifyInstructors,async(req,res)=>{
       const result=await classesCollection.find().toArray();
       res.send(result)
     })
@@ -190,7 +213,7 @@ async function run() {
       }
       const query = { email: email };
       const user = await usersCollection.findOne(query);
-      const result = { admin: user?.role};
+      const result = { admin: user?.role==="admin"};
       res.send(result);
     });
 
@@ -213,10 +236,12 @@ async function run() {
 
 
 
-    app.get("/users", async (req, res) => {
+    app.get("/users",verifiedJWT,verifyAdmin, async (req, res) => {
       const result = await usersCollection.find().toArray();
       res.send(result);
     });
+
+
 
     app.patch("/users/:id", async (req, res) => {
       const id = req.params.id;
