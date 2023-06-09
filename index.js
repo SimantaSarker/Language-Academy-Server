@@ -207,9 +207,16 @@ async function run() {
 
 
     // Find All Approve classes
-    app.get("/courses/approve",verifiedJWT, async (req, res) => {
+    app.get("/courses/approve", async (req, res) => {
       const  query = { status:"approve" };
       const result = await classesCollection.find(query).toArray();
+      res.send(result);
+    });
+
+    // Find all instructors 
+    app.get("/users/instructors", async (req, res) => {
+      const  query = { role:"instructors" };
+      const result = await usersCollection.find(query).toArray();
       res.send(result);
     });
 
