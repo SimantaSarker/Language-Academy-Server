@@ -54,6 +54,7 @@ async function run() {
     await client.connect();
 
     const usersCollection = client.db("languageDb").collection("users");
+    const classesCollection = client.db("languageDb").collection("courses");
 
     app.post("/users", async (req, res) => {
       const user = req.body;
@@ -110,16 +111,54 @@ async function run() {
     };
 
 
-    // verify users middle ware
-    // const verifyUser=async (req,res,next)=>{
-    //   const email=req.decode.email;
-    //   const query={email:email}
-    //   const user=await usersCollection.findOne(query);
-    //   req.role=user?.role;
-    //   next();
 
-    // }
-  
+
+    // Instructors Added Classes using post
+    app.post("/courses",verifiedJWT,verifyInstructors,async(req,res)=>{
+      const course=req.body;
+      const result=await classesCollection.insertOne(course);
+      res.send(result)
+
+    })
+
+
+
+    app.patch("/courses/:id",async(req,res)=>{
+      const id=req.params.id;
+      const {status}=req.body;
+      if(status=="approve")
+      {
+        const filter = { _id: new ObjectId(id) };
+        const updateDoc = {
+          $set: {
+            status: status,
+          },
+        };
+        const result = await classesCollection.updateOne(filter, updateDoc);
+        res.send(result);
+      }
+      if(status==="deny")
+      {
+        const filter = { _id: new ObjectId(id) };
+        const updateDoc = {
+          $set: {
+            status: status,
+          },
+        };
+        const result = await classesCollection.updateOne(filter, updateDoc);
+        res.send(result);
+
+      }
+      
+    })
+
+
+
+    app.get("/courses",async(req,res)=>{
+      const result=await classesCollection.find().toArray();
+      res.send(result)
+    })
+
 
 
 
@@ -205,6 +244,10 @@ async function run() {
         res.send(result);
       }
     });
+
+
+
+   
 
     // Send a ping to confirm a successful connection
     await client.db("admin").command({ ping: 1 });
