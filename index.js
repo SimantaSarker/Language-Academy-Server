@@ -204,6 +204,19 @@ async function run() {
 
     })
 
+
+
+    // Find All Approve classes
+    app.get("/courses/approve",verifiedJWT, async (req, res) => {
+      const  query = { status:"approve" };
+      const result = await classesCollection.find(query).toArray();
+      res.send(result);
+    });
+
+
+
+
+
     //----Check user is admin or not---
 
     app.get("/users/admin/:email",verifiedJWT,verifyAdmin,async (req, res) => {
