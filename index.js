@@ -154,6 +154,12 @@ async function run() {
 
 
 
+    app.post("/carts",async(req,res)=>{
+      const cart=req.body;
+      console.log(cart)
+    })
+
+
     app.patch("/courses/feedback/:id",verifiedJWT,verifyAdmin,async(req,res)=>{
       const id=req.params.id;
       const {feedback}=req.body;
@@ -193,7 +199,7 @@ async function run() {
       }
       const query = { email: email };
       const user = await usersCollection.findOne(query);
-      if(!user?.role)
+      if(!user?.role )
       {
         const result={role:"student"};
         return res.send(result)
