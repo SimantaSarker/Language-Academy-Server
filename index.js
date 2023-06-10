@@ -55,6 +55,7 @@ async function run() {
 
     const usersCollection = client.db("languageDb").collection("users");
     const classesCollection = client.db("languageDb").collection("courses");
+    const cartCollection=client.db("languageDb").collection("carts")
 
     app.post("/users", async (req, res) => {
       const user = req.body;
@@ -154,10 +155,27 @@ async function run() {
 
 
 
+    // After clicked enrolled button  added to My selected class for student dashboard
     app.post("/carts",async(req,res)=>{
-      const cart=req.body;
-      console.log(cart)
+      const cartItem=req.body;
+      const cartId=cartItem.courseId;
+      const query={courseId:cartId};
+      const alreadyExistsId=await cartCollection.findOne(query) ;
+      if(alreadyExistsId)
+      {
+    return res.send({message:"You have already clicked Select Button"});
+      }
+      const result = await cartCollection.insertOne(cartItem);
+      res.send(result);
     })
+
+
+
+    app.get("/carts",verifiedJWT,async(req,res)=>{
+      const carts=await cartCollection.find().toArray();
+      res.send(carts)
+    })
+
 
 
     app.patch("/courses/feedback/:id",verifiedJWT,verifyAdmin,async(req,res)=>{
