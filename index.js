@@ -2,15 +2,14 @@ const express = require("express");
 const cors = require("cors");
 const { MongoClient, ServerApiVersion, ObjectId } = require("mongodb");
 const app = express();
-const jwt = require('jsonwebtoken');
+const jwt = require("jsonwebtoken");
 require("dotenv").config();
+const stripe = require("stripe")(process.env.PAYMENT_SECRET_KEY);
 const port = process.env.PORT || 5000;
 
 // middle ware
 app.use(cors());
 app.use(express.json());
-
-
 
 const verifiedJWT = (req, res, next) => {
   const authorization = req.headers.authorization;
@@ -33,10 +32,6 @@ const verifiedJWT = (req, res, next) => {
   });
 };
 
-
-
-
-
 const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASS}@cluster0.sk94onm.mongodb.net/?retryWrites=true&w=majority`;
 
 // Create a MongoClient with a MongoClientOptions object to set the Stable API version
@@ -55,7 +50,8 @@ async function run() {
 
     const usersCollection = client.db("languageDb").collection("users");
     const classesCollection = client.db("languageDb").collection("courses");
-    const cartCollection=client.db("languageDb").collection("carts")
+    const cartCollection = client.db("languageDb").collection("carts");
+    const paymentCollection = client.db("languageDb").collection("payments");
 
     app.post("/users", async (req, res) => {
       const user = req.body;
@@ -78,10 +74,8 @@ async function run() {
       });
       res.send({ token });
     });
-    
 
-
-   //------Verify that user is Admin or Not-----
+    //------Verify that user is Admin or Not-----
     const verifyAdmin = async (req, res, next) => {
       const email = req.decode.email;
       const query = { email: email };
@@ -91,11 +85,9 @@ async function run() {
           .status(401)
           .send({ error: true, message: "You are not an admin" });
       }
-    
-   
+
       next();
     };
-
 
     //----------verify user is Instructors or not---------
 
@@ -111,24 +103,17 @@ async function run() {
       next();
     };
 
-
-
-
     // Instructors Added Classes using post
-    app.post("/courses",verifiedJWT,verifyInstructors,async(req,res)=>{
-      const course=req.body;
-      const result=await classesCollection.insertOne(course);
-      res.send(result)
+    app.post("/courses", verifiedJWT, verifyInstructors, async (req, res) => {
+      const course = req.body;
+      const result = await classesCollection.insertOne(course);
+      res.send(result);
+    });
 
-    })
-
-
-
-    app.patch("/courses/:id",async(req,res)=>{
-      const id=req.params.id;
-      const {status}=req.body;
-      if(status=="approve")
-      {
+    app.patch("/courses/:id", async (req, res) => {
+      const id = req.params.id;
+      const { status } = req.body;
+      if (status == "approve") {
         const filter = { _id: new ObjectId(id) };
         const updateDoc = {
           $set: {
@@ -138,8 +123,7 @@ async function run() {
         const result = await classesCollection.updateOne(filter, updateDoc);
         res.send(result);
       }
-      if(status==="deny")
-      {
+      if (status === "deny") {
         const filter = { _id: new ObjectId(id) };
         const updateDoc = {
           $set: {
@@ -148,33 +132,26 @@ async function run() {
         };
         const result = await classesCollection.updateOne(filter, updateDoc);
         res.send(result);
-
       }
-      
-    })
-
-
+    });
 
     // After clicked enrolled button  added to My selected class for student dashboard
-    app.post("/carts",async(req,res)=>{
-      const cartItem=req.body;
-      const cartId=cartItem.courseId;
-      const query={courseId:cartId};
-      const alreadyExistsId=await cartCollection.findOne(query) ;
-      if(alreadyExistsId)
-      {
-    return res.send({message:"You have already clicked Select Button"});
+    app.post("/carts", async (req, res) => {
+      const cartItem = req.body;
+      const cartId = cartItem.courseId;
+      const query = { courseId: cartId };
+      const alreadyExistsId = await cartCollection.findOne(query);
+      if (alreadyExistsId) {
+        return res.send({ message: "You have already clicked Select Button" });
       }
       const result = await cartCollection.insertOne(cartItem);
       res.send(result);
-    })
+    });
 
-
-
-    app.get("/carts",verifiedJWT,async(req,res)=>{
-      const carts=await cartCollection.find().toArray();
-      res.send(carts)
-    })
+    app.get("/carts", verifiedJWT, async (req, res) => {
+      const carts = await cartCollection.find().toArray();
+      res.send(carts);
+    });
 
     // delete specific cart from cartCollection
     app.delete("/carts/:id", async (req, res) => {
@@ -184,116 +161,142 @@ async function run() {
       res.send(result);
     });
 
-
-
-    app.patch("/courses/feedback/:id",verifiedJWT,verifyAdmin,async(req,res)=>{
-      const id=req.params.id;
-      const {feedback}=req.body;
-      const filter = { _id: new ObjectId(id) };
-      const updateDoc = {
-        $set: {
-          feedback: feedback,
-        },
-      };
-      const result = await classesCollection.updateOne(filter, updateDoc);
+    app.get("/carts/:id", verifiedJWT, async (req, res) => {
+      const id = req.params.id;
+      const query = { _id: new ObjectId(id) };
+      const result = await cartCollection.find(query).toArray();
       res.send(result);
+    });
 
-    })
+    //--------------Create payment intent-----
 
+    app.post("/create-payment-intent", verifiedJWT, async (req, res) => {
+      const { price } = req.body;
+      const amount = price * 100;
 
+      // Create a PaymentIntent with the order amount and currency
+      const paymentIntent = await stripe.paymentIntents.create({
+        amount: amount,
+        currency: "usd",
+        payment_method_types: ["card"],
+      });
 
-    app.get("/courses",verifiedJWT,verifyAdmin,async(req,res)=>{
-      const result=await classesCollection.find().toArray();
-      res.send(result)
-    })
+      res.send({
+        clientSecret: paymentIntent.client_secret,
+      });
+    });
 
+    //-------------payment related api------------
+    app.post("/payments", async (req, res) => {
+      const payment = req.body;
+      const insertResult = await paymentCollection.insertOne(payment);
+      const query = { _id: new ObjectId(payment.cartId) };
+      const deleteResult = await cartCollection.deleteOne(query);
+      res.send({insertResult, deleteResult});
+    });
 
+    app.patch(
+      "/courses/feedback/:id",
+      verifiedJWT,
+      verifyAdmin,
+      async (req, res) => {
+        const id = req.params.id;
+        const { feedback } = req.body;
+        const filter = { _id: new ObjectId(id) };
+        const updateDoc = {
+          $set: {
+            feedback: feedback,
+          },
+        };
+        const result = await classesCollection.updateOne(filter, updateDoc);
+        res.send(result);
+      }
+    );
 
-    app.get("/courses/allCourses",verifiedJWT,verifyInstructors,async(req,res)=>{
-      const result=await classesCollection.find().toArray();
-      res.send(result)
-    })
+    app.get("/courses", verifiedJWT, verifyAdmin, async (req, res) => {
+      const result = await classesCollection.find().toArray();
+      res.send(result);
+    });
 
+    app.get(
+      "/courses/allCourses",
+      verifiedJWT,
+      verifyInstructors,
+      async (req, res) => {
+        const result = await classesCollection.find().toArray();
+        res.send(result);
+      }
+    );
 
-
-
-    app.get("/users/verify/:email",verifiedJWT,async(req,res)=>{
-      
-      const email=req.params.email;
+    app.get("/users/verify/:email", verifiedJWT, async (req, res) => {
+      const email = req.params.email;
       if (req.decode.email !== email) {
         res.send({ user: false });
       }
       const query = { email: email };
       const user = await usersCollection.findOne(query);
-      if(!user?.role )
-      {
-        const result={role:"student"};
-        return res.send(result)
-
+      if (!user?.role) {
+        const result = { role: "student" };
+        return res.send(result);
       }
-      const result = { role: user?.role};
+      const result = { role: user?.role };
       res.send(result);
-
-    })
-
-
+    });
 
     // Find All Approve classes
     app.get("/courses/approve", async (req, res) => {
-      const  query = { status:"approve" };
+      const query = { status: "approve" };
       const result = await classesCollection.find(query).toArray();
       res.send(result);
     });
 
-    // Find all instructors 
+    // Find all instructors
     app.get("/users/instructors", async (req, res) => {
-      const  query = { role:"instructors" };
+      const query = { role: "instructors" };
       const result = await usersCollection.find(query).toArray();
       res.send(result);
     });
 
-
-
-
-
     //----Check user is admin or not---
 
-    app.get("/users/admin/:email",verifiedJWT,verifyAdmin,async (req, res) => {
-      const email = req.params.email;
-      if (req.decode.email !== email) {
-        res.send({ admin: false });
+    app.get(
+      "/users/admin/:email",
+      verifiedJWT,
+      verifyAdmin,
+      async (req, res) => {
+        const email = req.params.email;
+        if (req.decode.email !== email) {
+          res.send({ admin: false });
+        }
+        const query = { email: email };
+        const user = await usersCollection.findOne(query);
+        const result = { admin: user?.role === "admin" };
+        res.send(result);
       }
-      const query = { email: email };
-      const user = await usersCollection.findOne(query);
-      const result = { admin: user?.role==="admin"};
-      res.send(result);
-    });
-
-
+    );
 
     //check user is instructors or not
 
-
-    app.get("/users/instructors/:email", verifiedJWT,verifyInstructors,async (req, res) => {
-      const email = req.params.email;
-      if (req.decode.email !== email) {
-        res.send({ instructors: false });
+    app.get(
+      "/users/instructors/:email",
+      verifiedJWT,
+      verifyInstructors,
+      async (req, res) => {
+        const email = req.params.email;
+        if (req.decode.email !== email) {
+          res.send({ instructors: false });
+        }
+        const query = { email: email };
+        const user = await usersCollection.findOne(query);
+        const result = { instructors: user?.role === "instructors" };
+        res.send(result);
       }
-      const query = { email: email };
-      const user = await usersCollection.findOne(query);
-      const result = { instructors: user?.role === "instructors" };
-      res.send(result);
-    });
+    );
 
-
-
-
-    app.get("/users",verifiedJWT,verifyAdmin, async (req, res) => {
+    app.get("/users", verifiedJWT, verifyAdmin, async (req, res) => {
       const result = await usersCollection.find().toArray();
       res.send(result);
     });
-
-
 
     app.patch("/users/:id", async (req, res) => {
       const id = req.params.id;
@@ -307,10 +310,9 @@ async function run() {
         };
         const result = await usersCollection.updateOne(filter, updateDoc);
         res.send(result);
-      };
+      }
 
-      if(body.instructorsId == 2)
-      {
+      if (body.instructorsId == 2) {
         const filter = { _id: new ObjectId(id) };
         const updateDoc = {
           $set: {
@@ -321,10 +323,6 @@ async function run() {
         res.send(result);
       }
     });
-
-
-
-   
 
     // Send a ping to confirm a successful connection
     await client.db("admin").command({ ping: 1 });
