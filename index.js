@@ -148,10 +148,10 @@ async function run() {
       res.send(result);
     });
 
-    app.get("/carts", verifiedJWT, async (req, res) => {
-      const carts = await cartCollection.find().toArray();
-      res.send(carts);
-    });
+    // app.get("/carts", verifiedJWT, async (req, res) => {
+    //   const carts = await cartCollection.find().toArray();
+    //   res.send(carts);
+    // });
 
     // delete specific cart from cartCollection
     app.delete("/carts/:id", async (req, res) => {
@@ -167,6 +167,30 @@ async function run() {
       const result = await cartCollection.find(query).toArray();
       res.send(result);
     });
+
+
+
+
+    app.get("/carts", verifiedJWT, async (req, res) => {
+      const email = req.query.email;
+
+      if (!email) {
+        return res.send([]);
+      }
+
+      const decodedEmail = req.decode.email;
+
+      if (email !== decodedEmail) {
+        return res
+          .status(403)
+          .send({ error: true, message: "Forbidden access" });
+      }
+      const query = { email: req.query.email };
+      const result = await cartCollection.find(query).toArray();
+      res.send(result);
+    });
+
+
 
     //--------------Create payment intent-----
 
@@ -192,8 +216,16 @@ async function run() {
       const insertResult = await paymentCollection.insertOne(payment);
       const query = { _id: new ObjectId(payment.cartId) };
       const deleteResult = await cartCollection.deleteOne(query);
-      res.send({insertResult, deleteResult});
+      res.send({ insertResult, deleteResult });
     });
+
+
+    app.get("/payments",async(req,res)=>{
+      const payments=await paymentCollection.find().toArray();
+      res.send(payments)
+    })
+
+
 
     app.patch(
       "/courses/feedback/:id",
@@ -227,6 +259,8 @@ async function run() {
         res.send(result);
       }
     );
+
+
 
     app.get("/users/verify/:email", verifiedJWT, async (req, res) => {
       const email = req.params.email;
