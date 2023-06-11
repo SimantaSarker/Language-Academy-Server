@@ -220,9 +220,20 @@ async function run() {
     });
 
 
-    app.get("/payments",async(req,res)=>{
-      const payments=await paymentCollection.find().toArray();
+    app.get("/payments/enrolled/:email",verifiedJWT,async(req,res)=>{
+      const email=req.params.email;
+      const query={email:email}
+      const payments=await paymentCollection.find(query).toArray();
       res.send(payments)
+    })
+
+
+
+    app.get("/payments/:email",async(req,res)=>{
+      const email=req.params.email;
+      const query={email:email}
+      const result=await paymentCollection.find(query).sort({ date: -1 }).toArray();
+      res.send(result)
     })
 
 
