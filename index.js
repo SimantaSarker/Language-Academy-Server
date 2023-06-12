@@ -168,9 +168,6 @@ async function run() {
       res.send(result);
     });
 
-
-
-
     app.get("/carts", verifiedJWT, async (req, res) => {
       const email = req.query.email;
 
@@ -189,8 +186,6 @@ async function run() {
       const result = await cartCollection.find(query).toArray();
       res.send(result);
     });
-
-
 
     //--------------Create payment intent-----
 
@@ -213,30 +208,45 @@ async function run() {
     //-------------payment related api------------
     app.post("/payments", async (req, res) => {
       const payment = req.body;
+      const courseId = payment.courseId;
       const insertResult = await paymentCollection.insertOne(payment);
       const query = { _id: new ObjectId(payment.cartId) };
       const deleteResult = await cartCollection.deleteOne(query);
-      res.send({ insertResult, deleteResult });
+      
+      const filter = { _id: new ObjectId(courseId) };
+      const classDoc = await classesCollection.findOne(filter);
+      const currentSeats = classDoc.seats;
+      const currentEnrolled = classDoc.enrolled;
+
+      // Update the seats and enrolled values
+      const updateDoc = {
+        $set: {
+          seats: currentSeats - 1,
+          enrolled: currentEnrolled + 1,
+        },
+      };
+
+      const updateEnroll = await classesCollection.updateOne(filter, updateDoc);
+
+      res.send({ insertResult, deleteResult, updateEnroll });
     });
 
+    app.get("/payments/enrolled/:email", verifiedJWT, async (req, res) => {
+      const email = req.params.email;
+      const query = { email: email };
+      const payments = await paymentCollection.find(query).toArray();
+      res.send(payments);
+    });
 
-    app.get("/payments/enrolled/:email",verifiedJWT,async(req,res)=>{
-      const email=req.params.email;
-      const query={email:email}
-      const payments=await paymentCollection.find(query).toArray();
-      res.send(payments)
-    })
-
-
-
-    app.get("/payments/:email",async(req,res)=>{
-      const email=req.params.email;
-      const query={email:email}
-      const result=await paymentCollection.find(query).sort({ date: -1 }).toArray();
-      res.send(result)
-    })
-
-
+    app.get("/payments/:email", verifiedJWT, async (req, res) => {
+      const email = req.params.email;
+      const query = { email: email };
+      const result = await paymentCollection
+        .find(query)
+        .sort({ date: -1 })
+        .toArray();
+      res.send(result);
+    });
 
     app.patch(
       "/courses/feedback/:id",
@@ -270,8 +280,6 @@ async function run() {
         res.send(result);
       }
     );
-
-
 
     app.get("/users/verify/:email", verifiedJWT, async (req, res) => {
       const email = req.params.email;
