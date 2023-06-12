@@ -109,7 +109,8 @@ async function run() {
       const result = await classesCollection.insertOne(course);
       res.send(result);
     });
-
+ 
+    //here is patch
     app.patch("/courses/:id", async (req, res) => {
       const id = req.params.id;
       const { status } = req.body;
