@@ -272,11 +272,13 @@ async function run() {
     });
 
     app.get(
-      "/courses/allCourses",
+      "/courses/allCourses/:email",
       verifiedJWT,
       verifyInstructors,
       async (req, res) => {
-        const result = await classesCollection.find().toArray();
+        const email=req.params.email;
+        const query={instructorEmail:email}
+        const result = await classesCollection.find(query).toArray();
         res.send(result);
       }
     );
