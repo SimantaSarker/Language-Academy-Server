@@ -109,7 +109,27 @@ async function run() {
       const result = await classesCollection.insertOne(course);
       res.send(result);
     });
- 
+
+    // popular section
+
+    app.get("/popular", async (req, res) => {
+      const query = { status: "approve" };
+      const result = await classesCollection
+        .find(query)
+        .sort({ enrolled: -1 })
+        .limit(6)
+        .toArray();
+      res.send(result);
+    });
+
+    // popular instructors
+
+    app.get("/popularInstructors", async (req, res) => {
+      const query = { role: "instructors" };
+      const instructors = await usersCollection.find(query).limit(6).toArray();
+      res.send(instructors);
+    });
+
     //here is patch
     app.patch("/courses/:id", async (req, res) => {
       const id = req.params.id;
@@ -213,7 +233,7 @@ async function run() {
       const insertResult = await paymentCollection.insertOne(payment);
       const query = { _id: new ObjectId(payment.cartId) };
       const deleteResult = await cartCollection.deleteOne(query);
-      
+
       const filter = { _id: new ObjectId(courseId) };
       const classDoc = await classesCollection.findOne(filter);
       const currentSeats = classDoc.seats;
@@ -277,8 +297,8 @@ async function run() {
       verifiedJWT,
       verifyInstructors,
       async (req, res) => {
-        const email=req.params.email;
-        const query={instructorEmail:email}
+        const email = req.params.email;
+        const query = { instructorEmail: email };
         const result = await classesCollection.find(query).toArray();
         res.send(result);
       }
