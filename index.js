@@ -1,6 +1,6 @@
 const express = require("express");
-const cors = require("cors");
 const { MongoClient, ServerApiVersion, ObjectId } = require("mongodb");
+const cors = require("cors");
 const app = express();
 const jwt = require("jsonwebtoken");
 require("dotenv").config();
@@ -46,7 +46,7 @@ const client = new MongoClient(uri, {
 async function run() {
   try {
     // Connect the client to the server	(optional starting in v4.7)
-    await client.connect();
+    // await client.connect();
 
     const usersCollection = client.db("languageDb").collection("users");
     const classesCollection = client.db("languageDb").collection("courses");
@@ -159,20 +159,11 @@ async function run() {
     // After clicked enrolled button  added to My selected class for student dashboard
     app.post("/carts", async (req, res) => {
       const cartItem = req.body;
-      const cartId = cartItem.courseId;
-      const query = { courseId: cartId };
-      const alreadyExistsId = await cartCollection.findOne(query);
-      if (alreadyExistsId) {
-        return res.send({ message: "You have already clicked Select Button" });
-      }
       const result = await cartCollection.insertOne(cartItem);
       res.send(result);
     });
 
-    // app.get("/carts", verifiedJWT, async (req, res) => {
-    //   const carts = await cartCollection.find().toArray();
-    //   res.send(carts);
-    // });
+ 
 
     // delete specific cart from cartCollection
     app.delete("/carts/:id", async (req, res) => {
@@ -406,8 +397,7 @@ async function run() {
       "Pinged your deployment. You successfully connected to MongoDB!"
     );
   } finally {
-    // Ensures that the client will close when you finish/error
-    // await client.close();
+ 
   }
 }
 run().catch(console.dir);
